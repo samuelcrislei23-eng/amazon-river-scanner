@@ -58,31 +58,38 @@ object ExamParser {
             val qw = questionWord.matchEntire(line)
             val alt = alternative.matchEntire(line)
             val qn = questionNumber.matchEntire(line)
+            val c0 = cur
 
             when {
                 qw != null -> {
-                    cur = Q(true).also { questions += it }
-                    append(cur.stem, qw.groupValues[2])
+                    val q = Q(true)
+                    questions.add(q)
+                    cur = q
+                    append(q.stem, qw.groupValues[2])
                 }
                 inline != null -> {
-                    val q = cur ?: Q(false).also { questions += it; cur = it }
+                    val q = c0 ?: Q(false).also { questions.add(it) }
+                    cur = q
                     if (inline.first.isNotEmpty()) {
                         val last = q.alts.lastOrNull()
                         if (last != null) append(last.text, inline.first) else append(q.stem, inline.first)
                     }
-                    inline.second.forEach { q.alts += Alt(StringBuilder(it)) }
+                    for (part in inline.second) q.alts.add(Alt(StringBuilder(part)))
                 }
-                alt != null && cur != null -> {
-                    cur.alts += Alt(StringBuilder(alt.groupValues[2].trim()))
+                alt != null && c0 != null -> {
+                    c0.alts.add(Alt(StringBuilder(alt.groupValues[2].trim())))
                 }
                 qn != null -> {
-                    cur = Q(true).also { questions += it }
-                    append(cur.stem, qn.groupValues[2])
+                    val q = Q(true)
+                    questions.add(q)
+                    cur = q
+                    append(q.stem, qn.groupValues[2])
                 }
                 else -> {
-                    if (cur == null) cur = Q(false).also { questions += it }
-                    val last = cur.alts.lastOrNull()
-                    if (last != null) append(last.text, line) else append(cur.stem, line)
+                    val q = c0 ?: Q(false).also { questions.add(it) }
+                    cur = q
+                    val last = q.alts.lastOrNull()
+                    if (last != null) append(last.text, line) else append(q.stem, line)
                 }
             }
         }
