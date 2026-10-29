@@ -8,7 +8,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
-/** Lê o texto de cada quadro da câmera (cerca de 1,4x por segundo). */
+/** Lê o texto de cada quadro do vídeo (cerca de 2x por segundo). */
 class TextAnalyzer(private val onLines: (List<String>) -> Unit) : ImageAnalysis.Analyzer {
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -18,7 +18,7 @@ class TextAnalyzer(private val onLines: (List<String>) -> Unit) : ImageAnalysis.
     override fun analyze(proxy: ImageProxy) {
         val now = SystemClock.elapsedRealtime()
         val media = proxy.image
-        if (now - last < 700 || media == null) {
+        if (now - last < 450 || media == null) {
             proxy.close()
             return
         }

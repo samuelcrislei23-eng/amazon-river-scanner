@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Size
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,13 +17,14 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -85,7 +87,7 @@ fun App(vm: ScannerViewModel = viewModel()) {
             )
             TabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.background) {
                 Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Scanner") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Prova (${vm.rawLines.size})") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Prova (${vm.kept})") })
             }
             if (tab == 0) ScannerTab(vm, granted) { launcher.launch(Manifest.permission.CAMERA) }
             else ExamTab(vm)
@@ -95,15 +97,12 @@ fun App(vm: ScannerViewModel = viewModel()) {
 
 @Composable
 fun ScannerTab(vm: ScannerViewModel, granted: Boolean, askPermission: () -> Unit) {
-    val ctx = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     var camera by remember { mutableStateOf<Camera?>(null) }
     var torch by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Box(
-            Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color.Black)
-        ) {
+        Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color.Black)) {
             if (granted) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
@@ -113,7 +112,12 @@ fun ScannerTab(vm: ScannerViewModel, granted: Boolean, askPermission: () -> Unit
                         future.addListener({
                             val provider = future.get()
                             val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
+                            val selector = ResolutionSelector.Builder()
+                                .setResolutionStrategy(
+                                    ResolutionStrategy(Size(1920, 1080), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER)
+                                ).build()
                             val analysis = ImageAnalysis.Builder()
+                                .setResolutionSelector(selector)
                                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                 .build()
                                 .also { it.setAnalyzer(ContextCompat.getMainExecutor(c), TextAnalyzer { l -> vm.onFrame(l) }) }
@@ -130,12 +134,13 @@ fun ScannerTab(vm: ScannerViewModel, granted: Boolean, askPermission: () -> Unit
                     Button(onClick = askPermission) { Text("Permitir câmera") }
                 }
             }
-            if (vm.live.isNotBlank()) {
-                Box(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp)
-                        .clip(RoundedCornerShape(14.dp)).background(Color(0xCC000000)).padding(10.dp)
-                ) {
-                    Text(vm.live.lines().takeLast(4).joinToString("\n"), color = Color.White, fontSize = 13.sp, maxLines = 4)
+            Column(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(8.dp)
+                    .clip(RoundedCornerShape(14.dp)).background(Color(0xCC000000)).padding(10.dp)
+            ) {
+                Text("${vm.kept} linhas aprovadas  ·  ${vm.cut} cortadas", color = RiverGreenLight, fontSize = 12.sp)
+                if (vm.live.isNotBlank()) {
+                    Text(vm.live.lines().takeLast(3).joinToString("\n"), color = Color.White, fontSize = 13.sp, maxLines = 3)
                 }
             }
         }
@@ -163,7 +168,7 @@ fun ExamTab(vm: ScannerViewModel) {
             value = vm.exam,
             onValueChange = { vm.onExamEdited(it) },
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            placeholder = { Text("Passe a câmera sobre o texto. A prova aparece aqui.") }
+            placeholder = { Text("Passe a câmera sobre o texto, devagar. A prova aparece aqui.") }
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(onClick = {
@@ -174,7 +179,7 @@ fun ExamTab(vm: ScannerViewModel) {
             OutlinedButton(onClick = {
                 val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, vm.exam) }
                 ctx.startActivity(Intent.createChooser(i, "Compartilhar prova"))
-            }, modifier = Modifier.weight(1f)) { Text("Compartilhar") }
+            }, modifier = Modifier.weight(1f)) { Text("Enviar") }
             OutlinedButton(onClick = { vm.remount() }, modifier = Modifier.weight(1f)) { Text("Remontar") }
         }
     }
